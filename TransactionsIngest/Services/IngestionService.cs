@@ -94,4 +94,53 @@ public class IngestionService
         return status == "Finalized";
     }
 
+    // updates the existing record if any of the relevant fields have changed
+    private bool UpdateTransactionIfChanged(Transaction existing, TransactionApiDto dto)
+    {
+        //
+        var changes = new List<(string Field, string Old, string New)>();
+
+        if (existing.LocationCode != dto.LocationCode)
+            changes.Add(("LocationCode", existing.LocationCode, dto.LocationCode));
+
+        if (existing.ProductName != dto.ProductName)
+            changes.Add(("ProductName", existing.ProductName, dto.ProductName));
+
+        if (existing.Amount != dto.Amount)
+            changes.Add(("Amount", existing.Amount.ToString("F2"), dto.Amount.ToString("F2")));
+
+        if (changes.Count == 0)
+        {
+            Console.WriteLine($"[UNCHANGED] Transaction {existing.TransactionId}");
+            return false;
+        }
+
+        existing.LocationCode = dto.LocationCode;
+        existing.ProductName = dto.ProductName;
+        existing.Amount = dto.Amount;
+        existing.Status = "Active"; // reactivate if it was previously revoked
+        existing.UpdatedAt = DateTime.UtcNow;
+
+        Console.WriteLine($"[UPDATE] Transaction {existing.TransactionId}");
+        foreach (var (field, old, newVal) in changes)
+        {
+            _db.TransactionRevisions.Add(new TransactionRevision
+            {
+                TransactionId = existing.TransactionId,
+                ChangeType = "Update",
+                FieldName = field,
+                OldValue = old,
+                NewValue = newVal,
+                ChangedAt = DateTime.UtcNow
+            });
+
+            Console.WriteLine($"  Field Changed: {field}");
+            Console.WriteLine($"  Old Value:     {old}");
+            Console.WriteLine($"  New Value:     {newVal}");
+        }
+
+        return true;
+    }
+
+ 
 }
