@@ -53,7 +53,36 @@ public class IngestionService
 
         try
         {
-            //stub will fill in after i write the insert/update/revoke logic
+            var snapshotIds = snapshot.Select(t => t.TransactionId).ToHashSet();
+
+            Console.WriteLine("Processing transactions...");
+            Console.WriteLine();
+
+            // insert new records and update existing ones based on the snapshot
+            foreach (var dto in snapshot)
+            {
+                var existing = await _db.Transactions.FindAsync(dto.TransactionId);
+
+                if (existing == null)
+                {
+                    bool insertedAsFinalized = InsertTransaction(dto, cutoff);
+                    newCount++;
+                    if (insertedAsFinalized) finalizedCount++;
+                }
+                else if (existing.Status == "Finalized")
+                {
+                    Console.WriteLine($"[SKIPPED] Transaction {dto.TransactionId} (already finalized)");
+                    unchangedCount++;
+                }
+                else
+                {
+                    bool changed = UpdateTransactionIfChanged(existing, dto);
+                    if (changed) updatedCount++;
+                    else unchangedCount++;
+                }
+            }
+
+
         }
         catch (Exception ex)
         {
