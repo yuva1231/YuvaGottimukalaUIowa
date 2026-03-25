@@ -141,6 +141,67 @@ public class IngestionService
 
         return true;
     }
+    
+   // marks active transactions within the 24h window that are missing from the snapshot
+    private async Task<int> RevokeAbsent(DateTime cutoff, HashSet<int> snapshotIds)
+    {
+        var toRevoke = await _db.Transactions
+            .Where(t => t.Status == "Active"
+                     && t.TransactionTime >= cutoff
+                     && !snapshotIds.Contains(t.TransactionId))
+            .ToListAsync();
+
+        foreach (var t in toRevoke)
+        {
+            t.Status = "Revoked";
+            t.UpdatedAt = DateTime.UtcNow;
+
+            _db.TransactionRevisions.Add(new TransactionRevision
+            {
+                TransactionId = t.TransactionId,
+                ChangeType = "Revoke",
+                ChangedAt = DateTime.UtcNow
+            });
+
+            Console.WriteLine($"[REVOKED] Transaction {t.TransactionId}");
+            Console.WriteLine($"  Reason: Missing from latest snapshot");
+        }
+
+        return toRevoke.Count;
+    }
+
+
+    // finalizes active records older than 24 hours so they can no longer change
+    private async Task<int> FinalizeOld(DateTime cutoff)
+    {
+        var toFinalize = await _db.Transactions
+            .Where(t => t.Status == "Active" && t.TransactionTime < cutoff)
+            .ToListAsync();
+
+        foreach (var t in toFinalize)
+        {
+            t.Status = "Finalized";
+            t.UpdatedAt = DateTime.UtcNow;
+
+            _db.TransactionRevisions.Add(new TransactionRevision
+            {
+                TransactionId = t.TransactionId,
+                ChangeType = "Finalize",
+                ChangedAt = DateTime.UtcNow
+            });
+
+            Console.WriteLine($"[FINALIZED] Transaction {t.TransactionId}");
+        }
+
+        return toFinalize.Count;
+    }
+
+    private static string HashCardNumber(string cardNumber)
+    {
+        using var sha256 = SHA256.Create();
+        var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(cardNumber));
+        return Convert.ToHexString(bytes).ToLower();
+    }
 
  
 }
