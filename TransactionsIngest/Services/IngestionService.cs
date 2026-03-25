@@ -1,5 +1,13 @@
-namespace TransactionsIngest.Services;
 
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using TransactionsIngest.Data;
+using TransactionsIngest.Models;
+
+namespace TransactionsIngest.Services;
 public class IngestionService
 {
     private readonly AppDbContext _db;
@@ -141,7 +149,7 @@ public class IngestionService
 
         return true;
     }
-    
+
    // marks active transactions within the 24h window that are missing from the snapshot
     private async Task<int> RevokeAbsent(DateTime cutoff, HashSet<int> snapshotIds)
     {
