@@ -57,6 +57,41 @@ public class IngestionService
             throw;
         }
     }
-}
 
-    
+    // inserts a new record; returns true if it was immediately finalized
+    private bool InsertTransaction(TransactionApiDto dto, DateTime cutoff)
+    {
+        var status = dto.Timestamp < cutoff ? "Finalized" : "Active";
+
+        // hash card number, store last 4 digits
+        var transaction = new Transaction
+        {
+            TransactionId = dto.TransactionId,
+            CardNumberHash = HashCardNumber(dto.CardNumber),
+            CardNumberLast4 = dto.CardNumber.Length >= 4 ? dto.CardNumber[^4..] : dto.CardNumber,
+            LocationCode = dto.LocationCode,
+            ProductName = dto.ProductName,
+            Amount = dto.Amount,
+            TransactionTime = dto.Timestamp,
+            Status = status,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _db.Transactions.Add(transaction);
+        _db.TransactionRevisions.Add(new TransactionRevision
+        {
+            TransactionId = dto.TransactionId,
+            ChangeType = status == "Finalized" ? "Finalize" : "Insert",
+            ChangedAt = DateTime.UtcNow
+        });
+
+        if (status == "Finalized")
+            Console.WriteLine($"[NEW] Transaction {dto.TransactionId} inserted (finalized - older than 24 hours)");
+        else
+            Console.WriteLine($"[NEW] Transaction {dto.TransactionId} inserted");
+
+        return status == "Finalized";
+    }
+
+}
