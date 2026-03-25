@@ -43,7 +43,20 @@ public class IngestionService
         // wrap everything in a DB transaction so repeated runs don't create duplicates
         using var dbTx = await _db.Database.BeginTransactionAsync();
 
-        
+        try
+        {
+            //stub will fill in after i write the insert/update/revoke logic
+        }
+        catch (Exception ex)
+        {
+            await dbTx.RollbackAsync();
+            Console.WriteLine();
+            Console.WriteLine($"ERROR: {ex.Message}");
+            Console.WriteLine("Database transaction rolled back.");
+            Console.WriteLine("=========================================");
+            throw;
+        }
     }
-
 }
+
+    
