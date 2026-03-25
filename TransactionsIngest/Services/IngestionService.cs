@@ -81,6 +81,46 @@ public class IngestionService
                     else unchangedCount++;
                 }
             }
+            
+            Console.WriteLine();
+            Console.WriteLine("Checking for revoked transactions...");
+            int revoked = await RevokeAbsent(cutoff, snapshotIds);
+            revokedCount += revoked;
+            if (revoked == 0)
+                Console.WriteLine("No revoked transactions found.");
+
+            Console.WriteLine();
+            Console.WriteLine("Finalizing transactions older than 24 hours...");
+            int finalized = await FinalizeOld(cutoff);
+            finalizedCount += finalized;
+            Console.WriteLine($"{finalized} transaction(s) finalized.");
+
+            await _db.SaveChangesAsync();
+            await dbTx.CommitAsync();
+
+            stopwatch.Stop();
+
+            int total = snapshot.Count;
+            bool noChanges = newCount == 0 && updatedCount == 0 && revokedCount == 0 && finalizedCount == 0;
+
+            Console.WriteLine();
+            Console.WriteLine("-----------------------------------------");
+            Console.WriteLine("Run Summary");
+            Console.WriteLine("-----------------------------------------");
+            Console.WriteLine($"New Transactions:        {newCount}");
+            Console.WriteLine($"Updated Transactions:    {updatedCount}");
+            Console.WriteLine($"Revoked Transactions:    {revokedCount}");
+            Console.WriteLine($"Finalized Transactions:  {finalizedCount}");
+            Console.WriteLine($"Total Processed:         {total}");
+            Console.WriteLine();
+
+            if (noChanges)
+                Console.WriteLine("No changes detected.");
+
+            Console.WriteLine();
+            Console.WriteLine("Database transaction committed successfully.");
+            Console.WriteLine($"Job completed in {stopwatch.ElapsedMilliseconds} ms.");
+            Console.WriteLine("=========================================");
 
 
         }
